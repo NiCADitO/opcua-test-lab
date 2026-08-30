@@ -1,0 +1,11 @@
+templates/
+.vscode/
+__pycache__/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+*.pem
+*.der
+*.key
