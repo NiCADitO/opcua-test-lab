@@ -3,8 +3,7 @@
 A personal practice project for learning test automation.
 
 It runs a small OPC UA server (built with [asyncua](https://github.com/FreeOpcUa/opcua-asyncio))
-and uses pytest to test it. Nothing here is meant for production — it exists so I can
-practice writing and running tests against something real.
+and uses pytest to test it
 
 ## Setup
 
