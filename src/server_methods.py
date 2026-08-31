@@ -1,7 +1,8 @@
 import asyncio
 import logging
 import random
-from asyncua import ua, uamethod, Server
+
+from asyncua import Server, ua, uamethod
 
 ENDPOINT = "opc.tcp://0.0.0.0:4840/freeopcua/server/"
 NAMESPACE_URI = "http://examples.freeopcua.github.io"
@@ -85,11 +86,12 @@ async def build_address_space(server):
     idx = await server.register_namespace(NAMESPACE_URI)
     objects = server.nodes.objects
 
-    await objects.add_folder(idx, "myEmptyFolder")
+    await objects.add_folder(idx, "MyEmptyFolder")
     obj = await objects.add_object(idx, "MyObject")
 
     my_variable = await obj.add_variable(idx, "MyVariable", 0)
-    await my_variable.set_writable()
+    my_writable_variable = await obj.add_variable(idx, "MyWritableVariable", 67)
+    await my_writable_variable.set_writable()
     await obj.add_variable(idx, "myarrayvar", [6.7, 8.9])
     await obj.add_variable(idx, "myStronglytTypedVariable", ua.Variant([], ua.VariantType.UInt32))
     await obj.add_property(idx, "MR. property", "I am MR. property!!!")

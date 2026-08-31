@@ -1,5 +1,6 @@
 import pytest
-import src.server_methods as server_methods
+from src import server_methods
+
 
 def test_add():
     result = server_methods.add.__wrapped__(None, 2, 2)
