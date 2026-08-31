@@ -20,5 +20,5 @@ py src/server_methods.py
 ## Run the tests
 
 ```
-pytest
+pytest tests/test_*.py
 ```
