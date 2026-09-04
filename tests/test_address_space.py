@@ -1,11 +1,13 @@
-from asyncua import ua
+import pytest
+import pytest_asyncio
+from asyncua import Client, Server, ua
 from src import server_methods
 
 EXPECTED_NODES_AND_TYPES = {
     "MyVariable": "Int64",
     "MyWritableVariable": "Int64",
     "myarrayvar": "Double",
-    "myStronglytTypedVariable": "UInt32",
+    "myStronglyTypedVariable": "UInt32",
     "MR. property": "String",
     "add": None,
     "subtract": None,
@@ -16,18 +18,38 @@ EXPECTED_NODES_AND_TYPES = {
     "is_even_async": None,
 }
 
-#TODO Read a method's OutputArguments and assert the declared DataType matches what it really returns. This catches your divide bug — declared Int64, returns a float 
-# def test_method_type():
 
-#TODO check object returns expected node id
+@pytest_asyncio.fixture(scope="module")
+async def run_server():
+    server = Server()
+    await server.init()
+    server.set_endpoint("opc.tcp://127.0.0.1:0/freeopcua/server/")
+    await server_methods.build_address_space(server)
+    async with server:
+        yield server
+
+
+@pytest_asyncio.fixture(scope="module")
+async def client(run_server):
+    url = f"opc.tcp://127.0.0.1:{run_server.bserver.port}/freeopcua/server/"
+    async with Client(url) as client:
+        yield client
+
+
+@pytest_asyncio.fixture(scope="module")
+async def my_object(client):
+    idx = await client.get_namespace_index(server_methods.NAMESPACE_URI)
+    return await client.nodes.objects.get_child(f"{idx}:MyObject"), idx
+
+
 async def test_object_node_id():
     server = server_methods.Server()
     await server.init()
     idx, _ = await server_methods.build_address_space(server)
     obj = await server.nodes.objects.get_child(f"{idx}:MyObject")
-    assert obj.nodeid.NamespaceIndex == 2
+    assert obj.nodeid.NamespaceIndex == idx
 
-# Check object method divide output argument returns the expected type
+
 async def test_out_arg_type():
     server = server_methods.Server()
     await server.init()
@@ -39,12 +61,12 @@ async def test_out_arg_type():
 
     assert declared[0].DataType == ua.NodeId(ua.ObjectIds.Double)
 
-#TODO Check MyObject exposes exactly the expected nodes and data types
-async def test_exposed_object_nodes():
+
+async def test_exposed_object_types():
     server = server_methods.Server()
     await server.init()
     idx, _ = await server_methods.build_address_space(server)
-    obj =  await server.nodes.objects.get_child(f"{idx}:MyObject")
+    obj = await server.nodes.objects.get_child(f"{idx}:MyObject")
 
     results = {}
     for n in await obj.get_children():
@@ -54,14 +76,19 @@ async def test_exposed_object_nodes():
         else:
             results[name] = None
 
-    # print("Results = " + str(results))
-
     assert results == EXPECTED_NODES_AND_TYPES
 
-    
 
-#TODO Subscribe to MyVariable, assert you receive expected number of updates inside a timeout
+# Uses prebuilt server, client, objects for tests
+async def test_writable_variable_takes_values(my_object):
+    obj, idx = my_object
+    var = await obj.get_child(f"{idx}:MyWritableVariable")
+    await var.write_value(121)
+    assert await var.read_value() == 121
 
-#TODO Check for wrong argument count. Writing to a read-only node
 
-#TODO Write to MyVariable, read it back, confirm set_writable() works
+async def test_read_only_variable_rejects_writes(my_object):
+    obj, idx = my_object
+    var = await obj.get_child(f"{idx}:MyVariable")
+    with pytest.raises(ua.UaStatusCodeError):
+        await var.write_value(55)
