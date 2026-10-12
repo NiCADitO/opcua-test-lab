@@ -136,6 +136,26 @@ async def build_address_space(server):
     return idx, my_variable
 
 
+async def build_events(server, idx):
+    """Create a custom event type and a generator that emits it from the Server object.
+
+    Kept out of build_address_space() so the existing tests don't change.
+    """
+    lab_event_type = await server.create_custom_event_type(
+        idx,
+        "LabEventType",
+        ua.ObjectIds.BaseEventType,
+        [
+            ("Counter", ua.VariantType.Int64),
+            ("Note", ua.VariantType.String),
+        ],
+    )
+    # Server object (i=2253) is the node most clients subscribe to for events.
+    event_gen = await server.get_event_generator(lab_event_type, ua.ObjectIds.Server)
+    event_gen.event.Severity = 500
+    return event_gen
+
+
 async def main():
     logging.basicConfig(level=logging.WARNING)
 
@@ -147,12 +167,20 @@ async def main():
     # TODO(lab): no security policy is set, so the server also accepts unencrypted
     # SecurityPolicy None sessions. Fine for a local lab; set one if you test secure endpoints.
 
-    _, my_variable = await build_address_space(server)
+    idx, my_variable = await build_address_space(server)
+    event_gen = await build_events(server, idx)
+    event_count = 0
 
     async with server:
         while True:
             await asyncio.sleep(1)
             await my_variable.write_value(random.randint(0, 100))
+            event_count += 1
+            # fire one event every 5 seconds
+            if event_count % 5 == 0:
+                event_gen.event.Counter = event_count
+                event_gen.event.Note = "lab event " + str(event_count)
+                await event_gen.trigger(message="LabEvent " + str(event_count))
 
 
 if __name__ == "__main__":
